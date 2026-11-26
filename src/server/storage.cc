@@ -71,6 +71,28 @@ class ConnectionError : public RpcError {
   using RpcError::RpcError;
 };
 
+// The name of the first REQUIRED field holding NULL in a decoded row, searching the fields of
+// each non-NULL STRUCT. BigQuery names a nested field without its parents. What it reports in a
+// repeated STRUCT is not known, so those are left to the destination's own checks.
+std::optional<std::string> RequiredNull(const json& row, const std::vector<FieldSchema>& schema) {
+  for (const auto& field : schema) {
+    const auto found = row.find(field.name);
+    if (found == row.end()) {
+      continue;
+    }
+    if (found->is_null()) {
+      if (field.mode == FieldMode::kRequired) {
+        return field.name;
+      }
+    } else if (field.type == FieldType::kRecord && field.mode != FieldMode::kRepeated) {
+      if (auto nested = RequiredNull(*found, field.fields)) {
+        return nested;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 [[noreturn]] void Fail(grpc::StatusCode code, const std::string& message) {
   throw RpcError(code, message);
 }
@@ -613,8 +635,8 @@ class WriteService final : public pb::BigQueryWrite::Service {
         response.mutable_error()->set_code(status.error_code());
         response.mutable_error()->set_message(status.error_message());
       }
-      response.set_write_stream(request.write_stream().empty() ? connection.name
-                                                               : request.write_stream());
+      // BigQuery names the stream only in answers to requests that name it.
+      response.set_write_stream(request.write_stream());
       if (!rpc->Write(response)) {
         return {grpc::StatusCode::CANCELLED, "AppendRows closed"};
       }
@@ -1000,6 +1022,12 @@ class WriteService final : public pb::BigQueryWrite::Service {
     const auto state =
         Get(request.write_stream().empty() ? connection.name : request.write_stream());
     const std::string& name = state->metadata.name();
+    // BigQuery ends the connection when a later Arrow request sends a writer schema without
+    // write_stream; whether it does so for one that repeats the schema is not known.
+    if (arrow && request.write_stream().empty() && request.arrow_rows().has_writer_schema()) {
+      throw ConnectionError(grpc::StatusCode::INVALID_ARGUMENT,
+                            "Invalid stream name. Entity: " + name);
+    }
     const bool changing = !connection.name.empty() && connection.name != name;
     if (changing && (!IsDefault(connection.name) || !IsDefault(name))) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT,
@@ -1118,18 +1146,13 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (arrow) {
       rows = connection.arrow_decoder->Decode(request.arrow_rows().rows().serialized_record_batch(),
                                               connection.default_missing, missing);
-      // BigQuery reports a NULL left in a REQUIRED column of an Arrow batch without a code.
+      // BigQuery reports a NULL left in a REQUIRED field of an Arrow batch without a code.
       for (size_t i = 0; i < rows.size(); ++i) {
-        const auto& row = rows.at(i);
-        const auto null = std::ranges::find_if(state->schema, [&](const FieldSchema& field) {
-          const auto found = row.find(field.name);
-          return field.mode == FieldMode::kRequired && found != row.end() && found->is_null();
-        });
-        if (null != state->schema.end()) {
+        if (const auto null = RequiredNull(rows.at(i), state->schema)) {
           auto* error = response.add_row_errors();
           error->set_index(static_cast<int64_t>(i));
-          error->set_message("Error found in field (or sub-field) '" + null->name + "': Field '" +
-                             null->name + "' is required but has null value.");
+          error->set_message("Error found in field (or sub-field) '" + *null + "': Field '" +
+                             *null + "' is required but has null value.");
         }
       }
     }

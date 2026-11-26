@@ -1,0 +1,68 @@
+version: 1
+description: >-
+  A Storage Write Arrow GEOGRAPHY value marked with the extension type that Storage Read gives
+  GEOGRAPHY columns. BigQuery ignores the name, as
+  tests/e2e/scenarios/testdata/storage_write_arrow_options.api.yaml shows for other columns, but
+  the emulator does not support TO_JSON_STRING with GEOGRAPHY, which the query reads it with.
+  Batches were written by arrow-go v18; the expectation is BigQuery's recorded answer in the
+  sidecar.
+vars:
+  dataset: bqa_${run}_${case}
+  stream: projects/${project}/datasets/${dataset}/tables/t/streams/_default
+templates:
+  append:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: CREATE TABLE `${project}.${dataset}.t` (${columns})
+            useLegacySql: false
+            location: US
+      - name: append
+        grpc:
+          method: google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows
+          headers:
+            x-goog-request-params: write_stream=${stream}
+          requests:
+            - writeStream: ${stream}
+              arrowRows:
+                writerSchema: {serializedSchema: '${schema}'}
+                rows: {serializedRecordBatch: '${batch}'}
+        observe:
+          code: /code
+          result: /messages/0/appendResult
+          errorCode: /messages/0/error/code
+          error: /messages/0/error/message
+          rowErrors: /messages/0/rowErrors
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: SELECT TO_JSON_STRING(t) AS row FROM `${project}.${dataset}.t` AS t ORDER BY TO_JSON_STRING(t)
+            useLegacySql: false
+            location: US
+        observe:
+          rows: /body/rows
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  # Utf8 'POINT(1 2)' marked ARROW:extension:name=google:sqlType:geography, as Storage Read marks GEOGRAPHY.
+  - name: geography_extension_on_geography
+    template: append
+    vars: {columns: "value GEOGRAPHY", schema: '/////9AAAAAQAAAAAAAKAAwACgAJAAQACgAAABAAAAAAAQQACAAIAAAABAAIAAAABAAAAAEAAAAYAAAAAAASABgAFAATABIADAAAAAgABAASAAAAFAAAAGgAAABsAAAAAAAFAWgAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAkAAAAGAAAAGdvb2dsZTpzcWxUeXBlOmdlb2dyYXBoeQAAAAAUAAAAQVJST1c6ZXh0ZW5zaW9uOm5hbWUAAAAAAAAAAAQABAAEAAAABQAAAHZhbHVlAAAA', batch: '/////5gAAAAUAAAAAAAAAAwAFgAUABMADAAEAAwAAAAYAAAAAAAAABQAAAAAAAADBAAKABgADAAIAAQACgAAABQAAABIAAAAAQAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAKAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAKAAAAUE9JTlQoMSAyKQAAAAAAAA=='}
+    expect:
+      append: {code: OK, result: {}}
+      query: {"rows": [{"f": [{"v": "{\"value\":\"POINT(1 2)\"}"}]}]}

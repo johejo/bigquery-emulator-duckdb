@@ -41,9 +41,10 @@ As in BigQuery, protobuf rejects an entire batch if a value exceeds its `STRING(
 Arrow accepts the documented [Storage Write Arrow mappings](../third_party/bigquery_docs/supported-data-types.md),
 as well as signed `Int64` for INT64 and `Time64(MICROSECOND)` for TIME. The
 `MONTH_DAY_NANO` encoding preserves INTERVAL values to nanosecond precision. Field and schema
-metadata are ignored, and as in BigQuery, dictionary-encoded fields are rejected. A compressed
-batch may decompress
-to at most 256 MiB. An Arrow `NULL` in a top-level column is a missing value, which
+metadata are ignored, including the extension types `google:sqlType:json`,
+`google:sqlType:geography` and `arrow.json` on any column; other extension types are
+unsupported. As in BigQuery, dictionary-encoded fields are rejected. A compressed batch may
+decompress to at most 256 MiB. An Arrow `NULL` in a top-level column is a missing value, which
 `default_missing_value_interpretation` and `missing_value_interpretations` can give the column's
 [default](../third_party/bigquery_docs/default-values.md), as they do for an unset protobuf field.
 
