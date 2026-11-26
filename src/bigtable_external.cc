@@ -505,8 +505,10 @@ cbt::RowSet RowSetOf(const KeyRanges& ranges) {
 }
 
 // A read of the rows staged as newline-delimited JSON at `path`, each value as the DuckDB type
-// of its field. A field a row has no value for is NULL.
-std::string StagedRead(const std::vector<FieldSchema>& schema, const std::string& path) {
+// of its field, where no row is longer than `longest` bytes. A field a row has no value for is
+// NULL.
+std::string StagedRead(const std::vector<FieldSchema>& schema, const std::string& path,
+                       size_t longest) {
   std::vector<std::string> columns;
   std::vector<std::string> types;
   for (const FieldSchema& field : schema) {
@@ -515,11 +517,12 @@ std::string StagedRead(const std::vector<FieldSchema>& schema, const std::string
     types.push_back(QuoteLiteral(field.name) + ": " +
                     QuoteLiteral(ToDuckDbReadType(TextJsons(field))));
   }
-  // A Bigtable row holds up to 256 MiB, which BYTES escaped as \\xNN in JSON make five times as
-  // large.
+  // read_json allocates buffers of maximum_object_size, so it only grows past the default of
+  // 16 MiB for a longer row: a Bigtable row holds up to 256 MiB, which escaped BYTES enlarge.
+  constexpr size_t kDefaultObjectSize = size_t{16} << 20U;
   return "SELECT " + Join(columns, ", ") + " FROM read_json(" + QuoteLiteral(path) +
-         ", format='newline_delimited', auto_detect=false, maximum_object_size=4294967295, "
-         "columns={" +
+         ", format='newline_delimited', auto_detect=false, maximum_object_size=" +
+         std::to_string(std::max(longest + 1, kDefaultObjectSize)) + ", columns={" +
          Join(types, ", ") + "})";
 }
 
@@ -634,6 +637,7 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
             const bool restrict = context.keys && !ReadCanFail(reads, text_key);
             const std::string path = context.files.Create(".json");
             std::ofstream staged(path, std::ios::binary);
+            size_t longest = 0;
             if (!restrict || !context.keys->empty()) {
               const auto rows =
                   restrict ? RowSetOf(*context.keys) : cbt::RowSet(cbt::RowRange::InfiniteRange());
@@ -660,7 +664,9 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
                 }
                 if (present && (!context.keys || KeyRangesContain(*context.keys, row->row_key()))) {
                   values[schema.front().name] = BytesValue(row->row_key(), text_key);
-                  staged << values.dump() << '\n';
+                  const std::string line = values.dump();
+                  longest = std::max(longest, line.size());
+                  staged << line << '\n';
                 }
               }
             }
@@ -668,7 +674,7 @@ TableRead BigtableExternalRead(GcsExternalData definition, std::vector<FieldSche
             if (!staged) {
               throw ApiError::Internal("Failed to stage a read of " + table_name);
             }
-            return StagedRead(schema, path);
+            return StagedRead(schema, path, longest);
           },
       .key_column = "rowkey",
   };
