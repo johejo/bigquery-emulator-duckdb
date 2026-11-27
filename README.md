@@ -250,10 +250,12 @@ GCS source URIs support one `*` in the object name, following the
 multiple asterisks are rejected. Wildcard expansion requires permission to list objects;
 exact URIs are read without listing. The emulator rejects patterns with no matches.
 
-`OBJ.FETCH_METADATA` reads object metadata from the same endpoint. Its authorizers are Cloud
-resource connections that `--connection PROJECT.LOCATION.CONNECTION=cloud_resource` declares,
-such as `--connection='test.us.storage=cloud_resource'`; see
-[ObjectRef functions](docs/compatibility.md#objectref-functions) for limits.
+`OBJ.FETCH_METADATA` and object tables read object metadata from the same endpoint. Their
+authorizers and connections are Cloud resource connections that
+`--connection PROJECT.LOCATION.CONNECTION=cloud_resource` declares, such as
+`--connection='test.us.storage=cloud_resource'`; see
+[ObjectRef functions](docs/compatibility.md#objectref-functions) and
+[object tables](docs/external-tables.md#object-tables) for limits.
 
 CSV and newline-delimited JSON loads accept gzip data from GCS, local files, and uploads.
 Compression is detected from the file contents, so a `.gz` extension is not required, and
@@ -299,8 +301,8 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
 - `EXTERNAL_QUERY` reaches the PostgreSQL, MySQL or Spanner databases that `--connection` configures,
-  and ObjectRef functions authorize with the Cloud resource connections it declares, rather than
-  connections that the Connection API creates.
+  and ObjectRef functions and object tables authorize with the Cloud resource connections it
+  declares, rather than connections that the Connection API creates.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
   every client, and is treated as having the BigQuery API enabled. Resource tags are stored as
   metadata; Cloud Resource Manager tag definitions and tag-based access controls are not checked,

@@ -63,6 +63,7 @@
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
+#include "src/multi_catalog.h"
 #include "src/query_parameters.h"
 #include "src/result_googlesql.h"
 #include "src/result_value.h"
@@ -694,7 +695,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
           googlesql::SimpleConstant::Create({name.ToString()}, value, &constant));
       catalog.variables->AddOwnedConstant(std::move(constant));
     }
-    GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
+    GOOGLESQL_RETURN_IF_ERROR(CreateMultiCatalog(
         "script", {catalog.variables.get(), &functions_, catalog.tables.get()}, &catalog.catalog));
     return catalog;
   }
@@ -774,7 +775,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     for (const googlesql::Function* function : functions_.functions()) {
       definition.functions->AddFunction(function);
     }
-    GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
+    GOOGLESQL_RETURN_IF_ERROR(CreateMultiCatalog(
         "function body", {definition.functions.get(), definition.catalog.tables.get()},
         &definition.body_catalog));
     auto function = std::make_unique<googlesql::TemplatedSQLFunction>(
@@ -856,7 +857,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     // script's variables (which would otherwise be captured as constants).
     if (segment.node()->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
         segment.node()->node_kind() == googlesql::AST_CREATE_TABLE_FUNCTION_STATEMENT) {
-      GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
+      GOOGLESQL_RETURN_IF_ERROR(CreateMultiCatalog(
           "function body", {&functions_, catalog.tables.get()}, &catalog.catalog));
     }
     GOOGLESQL_ASSIGN_OR_RETURN(

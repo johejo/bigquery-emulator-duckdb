@@ -62,9 +62,10 @@ func (e *probeSetupError) Error() string {
 	return fmt.Sprintf("setup failed: %s: %s", e.statement, e.message)
 }
 
-// probeQuery runs sql on a fresh emulator holding the fixture and classifies the outcome.
+// probeQuery runs sql on a fresh emulator holding the fixture and classifies the outcome. Object
+// tables read through the Cloud resource connection test.us.probe.
 func probeQuery(binary string, setup []string, sql string) (probereport.Probe, error) {
-	emulator, err := startEmulator(binary)
+	emulator, err := startEmulator(binary, "--connection", "test.us.probe=cloud_resource")
 	if err != nil {
 		return probereport.Probe{}, err
 	}

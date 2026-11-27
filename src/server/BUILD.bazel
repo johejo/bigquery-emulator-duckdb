@@ -110,6 +110,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "//:api_error",
+        "//:connection_id",
         "//:httplib",
         "//:query_parameters",
         "//:timestamp_precision",

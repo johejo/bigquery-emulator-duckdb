@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -16,6 +17,7 @@
 #include "google/cloud/options.h"
 #include "google/cloud/status.h"
 #include "google/cloud/storage/client.h"
+#include "google/cloud/storage/object_metadata.h"
 #include "google/cloud/storage/options.h"
 #include "google/cloud/storage/well_known_parameters.h"
 #include "src/api_error.h"
@@ -105,22 +107,35 @@ const std::string& GcsClient::endpoint() const {
   return impl_->options.get<storage::RestEndpointOption>();
 }
 
-std::vector<std::string> GcsClient::Expand(const std::string& uri) {
-  if (FindGcsWildcard(uri) == std::string::npos) {
-    return {uri};
+namespace {
+
+GcsObjectMetadata ToMetadata(const storage::ObjectMetadata& metadata) {
+  GcsObjectMetadata result{
+      .content_type = metadata.content_type(),
+      .md5_hash = metadata.md5_hash(),
+      .size = metadata.size(),
+      .generation = metadata.generation(),
+      .updated = metadata.updated(),
+      .custom = {},
+  };
+  for (const auto& [key, value] : metadata.metadata()) {
+    result.custom.emplace_back(key, value);
   }
+  return result;
+}
+
+// The objects that the wildcard `uri` matches, ordered by URI. The documented file-name pattern
+// (fed-sample*.csv) excludes subfolders, whereas *.csv and a trailing prefix wildcard include
+// them. third_party/bigquery_docs/batch-loading-data.md
+std::vector<GcsObject> ListMatches(storage::Client client, const std::string& uri) {
   const auto [bucket, object] = ParseGcsUri(uri);
   const size_t wildcard = object.find('*');
   const std::string prefix = object.substr(0, wildcard);
   const std::string suffix = object.substr(wildcard + 1);
-  // The documented file-name pattern (fed-sample*.csv) excludes subfolders,
-  // whereas *.csv and a trailing prefix wildcard include them.
-  // third_party/bigquery_docs/batch-loading-data.md
   const bool filename_pattern = !prefix.empty() && prefix.back() != '/' && !suffix.empty() &&
                                 suffix.find('/') == std::string::npos;
-  storage::Client client = impl_->client();
   const std::string bucket_uri = "gs://" + bucket + "/";
-  std::vector<std::string> matches;
+  std::vector<GcsObject> matches;
   for (const auto& entry : client.ListObjects(bucket, storage::Prefix(prefix))) {
     if (!entry) {
       throw ApiError::Invalid("Could not list GCS objects: " + uri + " (" +
@@ -132,14 +147,41 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
       if (filename_pattern && name.find('/', prefix.size()) != std::string::npos) {
         continue;
       }
-      matches.push_back(bucket_uri + name);
+      matches.push_back({.uri = bucket_uri + name, .metadata = ToMetadata(*entry)});
     }
   }
+  std::ranges::sort(matches, {}, &GcsObject::uri);
+  return matches;
+}
+
+}  // namespace
+
+std::vector<std::string> GcsClient::Expand(const std::string& uri) {
+  if (FindGcsWildcard(uri) == std::string::npos) {
+    return {uri};
+  }
+  std::vector<GcsObject> objects = ListMatches(impl_->client(), uri);
+  std::vector<std::string> matches;
+  std::ranges::transform(objects, std::back_inserter(matches),
+                         [](GcsObject& object) { return std::move(object.uri); });
   if (matches.empty()) {
     throw ApiError::Invalid("No GCS objects match: " + uri);
   }
-  std::ranges::sort(matches);
   return matches;
+}
+
+std::vector<GcsObject> GcsClient::List(const std::string& uri) {
+  if (FindGcsWildcard(uri) != std::string::npos) {
+    return ListMatches(impl_->client(), uri);
+  }
+  try {
+    return {{.uri = uri, .metadata = Metadata(uri)}};
+  } catch (const ApiError& error) {
+    if (error.http_status() == 404) {
+      return {};
+    }
+    throw;
+  }
 }
 
 GcsObjectMetadata GcsClient::Metadata(const std::string& uri) {
@@ -152,13 +194,7 @@ GcsObjectMetadata GcsClient::Metadata(const std::string& uri) {
     throw metadata.status().code() == cloud::StatusCode::kNotFound ? ApiError::NotFound(message)
                                                                    : ApiError::Invalid(message);
   }
-  return {
-      .content_type = metadata->content_type(),
-      .md5_hash = metadata->md5_hash(),
-      .size = metadata->size(),
-      .generation = metadata->generation(),
-      .updated = metadata->updated(),
-  };
+  return ToMetadata(*metadata);
 }
 
 void GcsClient::Download(const std::string& uri, const std::filesystem::path& output) {

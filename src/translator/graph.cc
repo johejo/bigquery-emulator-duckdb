@@ -288,8 +288,8 @@ bool SupportedMeasure(const googlesql::ResolvedExpr& expr) {
 std::optional<std::string> CreatePropertyGraph(
     const googlesql::ResolvedCreatePropertyGraphStmt& create, const Scope& scope) {
   if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
-      !create.option_list().empty()) {
-    return Unsupported(scope, "property graph scopes or options");
+      !create.option_list().empty() || create.connection_list() != nullptr) {
+    return Unsupported(scope, "property graph scopes, options or connections");
   }
   if (std::ranges::any_of(create.label_list(),
                           [](const auto& label) { return !label->options_list().empty(); })) {

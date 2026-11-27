@@ -1,5 +1,6 @@
 #include "src/connection_id.h"
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -39,6 +40,18 @@ std::optional<std::string> ConnectionKey(std::string_view connection_id,
     return std::nullopt;
   }
   return parts.at(0) + "." + absl::AsciiStrToLower(parts.at(1)) + "." + parts.at(2);
+}
+
+std::string ConnectionKeyLocation(std::string_view key) {
+  const size_t connection = key.rfind('.');
+  if (connection == std::string_view::npos || connection == 0) {
+    return "";
+  }
+  const size_t location = key.rfind('.', connection - 1);
+  if (location == std::string_view::npos) {
+    return "";
+  }
+  return std::string(key.substr(location + 1, connection - location - 1));
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -115,7 +115,7 @@ rejected.
 | `CREATE TABLE COPY` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
 | `CREATE TABLE CLONE` | Supported | See [Partition expiration](compatibility.md#partition-expiration). |
 | `CREATE SNAPSHOT TABLE` | Supported | See [Time travel](compatibility.md#time-travel) and [Partition expiration](compatibility.md#partition-expiration). |
-| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: Bigtable column family option protoConfig. |
+| `CREATE EXTERNAL TABLE` | Partial | See [External tables](compatibility.md#external-tables). Unsupported: Bigtable column family option protoConfig; CREATE EXTERNAL TABLE option max_staleness; default connections. |
 | `DROP TABLE` | Supported |  |
 | `DROP EXTERNAL TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |

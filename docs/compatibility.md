@@ -85,7 +85,7 @@ dataset are unsupported, including enabling the setting on a dataset containing 
 ### External tables
 
 See [External table limits](external-tables.md) for Parquet, CSV, JSON and Bigtable reads,
-schema detection, type conversions, Hive partitioning and metadata updates.
+object tables, schema detection, type conversions, Hive partitioning and metadata updates.
 
 ### Resource tags
 

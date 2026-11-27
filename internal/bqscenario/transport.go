@@ -221,6 +221,7 @@ func (transport *Transport) gcs(ctx context.Context, original GCSRequest, vars m
 	}
 	var body io.Reader
 	var target string
+	var contentType string
 	switch request.Method {
 	case http.MethodPut:
 		if request.Base64 == nil {
@@ -230,9 +231,34 @@ func (transport *Transport) gcs(ctx context.Context, original GCSRequest, vars m
 		if err != nil {
 			return Response{}, fmt.Errorf("base64: %w", err)
 		}
+		contentType = request.ContentType
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
 		body = bytes.NewReader(media)
 		target = fmt.Sprintf("%s/upload/storage/v1/b/%s/o?uploadType=media&name=%s", transport.GCSEndpoint,
 			url.PathEscape(bucket), url.QueryEscape(request.Object))
+		if request.Metadata != nil {
+			// Custom metadata takes a multipart upload of the object's resource and contents.
+			resource, err := json.Marshal(map[string]any{
+				"name":        request.Object,
+				"contentType": contentType,
+				"metadata":    request.Metadata,
+			})
+			if err != nil {
+				return Response{}, err
+			}
+			var multipart bytes.Buffer
+			const boundary = "bqscenario"
+			fmt.Fprintf(&multipart, "--%s\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n%s\r\n"+
+				"--%s\r\nContent-Type: %s\r\n\r\n", boundary, resource, boundary, contentType)
+			multipart.Write(media)
+			fmt.Fprintf(&multipart, "\r\n--%s--\r\n", boundary)
+			body = &multipart
+			contentType = "multipart/related; boundary=" + boundary
+			target = fmt.Sprintf("%s/upload/storage/v1/b/%s/o?uploadType=multipart", transport.GCSEndpoint,
+				url.PathEscape(bucket))
+		}
 	case http.MethodDelete:
 		target = fmt.Sprintf("%s/storage/v1/b/%s/o/%s", transport.GCSEndpoint, url.PathEscape(bucket),
 			url.PathEscape(request.Object))
@@ -247,7 +273,9 @@ func (transport *Transport) gcs(ctx context.Context, original GCSRequest, vars m
 	if err != nil {
 		return Response{}, err
 	}
-	call.Header.Set("Content-Type", "application/octet-stream")
+	if contentType != "" {
+		call.Header.Set("Content-Type", contentType)
+	}
 	if transport.token != "" {
 		call.Header.Set("Authorization", "Bearer "+transport.token)
 	}

@@ -95,7 +95,13 @@ struct GcsExternalData {
   // Whether tables.insert gave a JSON table with autodetect its schema, which reads take
   // differently from a detected one. The table's comment keeps it; its resource does not show it.
   bool given_schema = false;
+  // objectMetadata of an object table, SIMPLE, whose format is empty.
+  std::optional<std::string> object_metadata = std::nullopt;
+  // The PROJECT.LOCATION.CONNECTION of an object table's connection, as ConnectionKey gives it.
+  std::optional<std::string> connection_id = std::nullopt;
   bool operator==(const GcsExternalData&) const = default;
+
+  [[nodiscard]] bool object_table() const { return object_metadata.has_value(); }
 };
 
 // Table.rangePartitioning: `field` split into partitions of `interval` from `start` to `end`.

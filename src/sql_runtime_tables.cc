@@ -18,6 +18,7 @@
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/column_metadata.h"
+#include "src/connection_id.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
@@ -224,6 +225,15 @@ TableInfo SqlRuntime::CreateTable(TableReference table, std::vector<FieldSchema>
   table = ResolveTableReference(std::move(table), /*create=*/true);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+  // An object table reads through a connection in its dataset's location, as a query does.
+  if (metadata.external_data && metadata.external_data->object_table()) {
+    const std::string key = metadata.external_data->connection_id.value_or("");
+    const std::string location = ConnectionKeyLocation(key);
+    if (CanonicalLocation(location).value_or(location) != dataset.Location()) {
+      throw ApiError::NotFound("Not found: Connection " + key + " was not found in location " +
+                               dataset.Location());
+    }
+  }
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id},
                &lock);

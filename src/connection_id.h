@@ -13,4 +13,8 @@ namespace bigquery_emulator_duckdb {
 std::optional<std::string> ConnectionKey(std::string_view connection_id,
                                          const std::string& default_project);
 
+// The location of the connection `key`, as ConnectionKey gives it, where only the project may
+// have dots; empty for a key of another form.
+std::string ConnectionKeyLocation(std::string_view key);
+
 }  // namespace bigquery_emulator_duckdb

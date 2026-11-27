@@ -1,0 +1,1698 @@
+{
+  "version": 1,
+  "cases": {
+    "ddl": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "schema": {}
+        },
+        "get": {
+          "external": {
+            "autodetect": true,
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/ddl/*"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7xjbk4utowz2ye6g65bzxcnug_ddl.t`\nWITH CONNECTION `johejo-sandbox.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/ddl/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        },
+        "rows": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/ddl/a.txt"
+                },
+                {
+                  "v": "text/plain"
+                },
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "b1946ac92492d2347c6235b4d2611184"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k1"
+                          },
+                          {
+                            "v": "v1"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k2"
+                          },
+                          {
+                            "v": "v2"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/ddl/b/c.bin"
+                },
+                {
+                  "v": "application/octet-stream"
+                },
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "d07d34efac6328007ad67c7e0a985e00"
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_uri",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_version",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "authorizer",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_updated",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/ddl/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "delete": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {},
+        "query": {
+          "message": "DML statements are only supported over tables that have data stored in BigQuery. Unsupported table: johejo-sandbox:bqa_u7xjbk4utowz2ye6g65bzxcnug_delete.t",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "missing_connection": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "Not found: Connection missing_u7xjbk4utowz2ye6g65bzxcnug",
+          "reason": "notFound",
+          "status": 404
+        }
+      }
+    },
+    "missing_exact_uri": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "no_match": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "overlapping_uris": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {},
+        "query": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/overlapping_uris/a.txt"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "rest": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "external": {
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest/*"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7xjbk4utowz2ye6g65bzxcnug_rest.t`\n(\n  uri STRING,\n  generation INT64,\n  content_type STRING,\n  size INT64,\n  md5_hash STRING,\n  updated TIMESTAMP,\n  metadata ARRAY\u003cSTRUCT\u003cname STRING, value STRING\u003e\u003e,\n  ref STRUCT\u003curi STRING, version STRING, authorizer STRING, details JSON\u003e\n)\nWITH CONNECTION `johejo-sandbox.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        },
+        "rows": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest/a.txt"
+                },
+                {
+                  "v": "text/plain"
+                },
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "b1946ac92492d2347c6235b4d2611184"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k2"
+                          },
+                          {
+                            "v": "v2"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k1"
+                          },
+                          {
+                            "v": "v1"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest/b/c.bin"
+                },
+                {
+                  "v": "application/octet-stream"
+                },
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "d07d34efac6328007ad67c7e0a985e00"
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_uri",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_version",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "authorizer",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_updated",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "rest_resource_connection": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "external": {
+            "autodetect": false,
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_resource_connection/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "autodetect": false,
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_resource_connection/*"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7xjbk4utowz2ye6g65bzxcnug_rest_resource_connection.t`\n(\n  uri STRING,\n  generation INT64,\n  content_type STRING,\n  size INT64,\n  md5_hash STRING,\n  updated TIMESTAMP,\n  metadata ARRAY\u003cSTRUCT\u003cname STRING, value STRING\u003e\u003e,\n  ref STRUCT\u003curi STRING, version STRING, authorizer STRING, details JSON\u003e\n)\nWITH CONNECTION `johejo-sandbox.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_resource_connection/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        },
+        "rows": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_resource_connection/a.txt"
+                },
+                {
+                  "v": "text/plain"
+                },
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "b1946ac92492d2347c6235b4d2611184"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k1"
+                          },
+                          {
+                            "v": "v1"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k2"
+                          },
+                          {
+                            "v": "v2"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_resource_connection/b/c.bin"
+                },
+                {
+                  "v": "application/octet-stream"
+                },
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "d07d34efac6328007ad67c7e0a985e00"
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_uri",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_version",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "authorizer",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_updated",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_resource_connection/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "rest_short_connection": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "external": {
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_short_connection/*"
+            ]
+          },
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "get": {
+          "external": {
+            "connectionId": "johejo-sandbox.us.storage",
+            "objectMetadata": "SIMPLE",
+            "sourceUris": [
+              "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_short_connection/*"
+            ]
+          },
+          "numBytes": "0",
+          "numRows": "0",
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "updated",
+                "type": "TIMESTAMP"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "uri",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "version",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "authorizer",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "details",
+                    "type": "JSON"
+                  }
+                ],
+                "mode": "NULLABLE",
+                "name": "ref",
+                "type": "RECORD"
+              }
+            ]
+          },
+          "type": "EXTERNAL"
+        },
+        "information_schema": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "EXTERNAL"
+                },
+                {
+                  "v": "NO"
+                },
+                {
+                  "v": "CREATE EXTERNAL TABLE `johejo-sandbox.bqa_u7xjbk4utowz2ye6g65bzxcnug_rest_short_connection.t`\n(\n  uri STRING,\n  generation INT64,\n  content_type STRING,\n  size INT64,\n  md5_hash STRING,\n  updated TIMESTAMP,\n  metadata ARRAY\u003cSTRUCT\u003cname STRING, value STRING\u003e\u003e,\n  ref STRUCT\u003curi STRING, version STRING, authorizer STRING, details JSON\u003e\n)\nWITH CONNECTION `johejo-sandbox.us.storage`\nOPTIONS(\n  object_metadata=SIMPLE,\n  uris=[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_short_connection/*\"]\n);"
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "type": "EXTERNAL"
+        },
+        "rows": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_short_connection/a.txt"
+                },
+                {
+                  "v": "text/plain"
+                },
+                {
+                  "v": "6"
+                },
+                {
+                  "v": "b1946ac92492d2347c6235b4d2611184"
+                },
+                {
+                  "v": [
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k2"
+                          },
+                          {
+                            "v": "v2"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "v": {
+                        "f": [
+                          {
+                            "v": "k1"
+                          },
+                          {
+                            "v": "v1"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"text/plain\",\"md5_hash\":\"b1946ac92492d2347c6235b4d2611184\",\"size\":6}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_short_connection/b/c.bin"
+                },
+                {
+                  "v": "application/octet-stream"
+                },
+                {
+                  "v": "2"
+                },
+                {
+                  "v": "d07d34efac6328007ad67c7e0a985e00"
+                },
+                {
+                  "v": []
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "true"
+                },
+                {
+                  "v": "johejo-sandbox.us.storage"
+                },
+                {
+                  "v": "{\"gcs_metadata\":{\"content_type\":\"application/octet-stream\",\"md5_hash\":\"d07d34efac6328007ad67c7e0a985e00\",\"size\":2}}"
+                },
+                {
+                  "v": "false"
+                }
+              ]
+            }
+          ],
+          "schema": {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "uri",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "content_type",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "size",
+                "type": "INTEGER"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "md5_hash",
+                "type": "STRING"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "STRING"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "metadata",
+                "type": "RECORD"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "generation",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_uri",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "ref_version",
+                "type": "BOOLEAN"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "authorizer",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details",
+                "type": "STRING"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "details_updated",
+                "type": "BOOLEAN"
+              }
+            ]
+          }
+        },
+        "table_options": {
+          "rows": [
+            {
+              "f": [
+                {
+                  "v": "object_metadata"
+                },
+                {
+                  "v": "STRING"
+                },
+                {
+                  "v": "SIMPLE"
+                }
+              ]
+            },
+            {
+              "f": [
+                {
+                  "v": "uris"
+                },
+                {
+                  "v": "ARRAY\u003cSTRING\u003e"
+                },
+                {
+                  "v": "[\"gs://johejo-sandbox-us/u7xjbk4utowz2ye6g65bzxcnug/rest_short_connection/*\"]"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "rest_with_schema": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "Specifying a schema is disallowed for STORAGE_FORMAT_OBJECT",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "rest_with_source_format": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "Request invalidated by conflicting fields. Fields 'source_format' and 'object_metadata' can not be used at the same time.",
+          "reason": "conflictingFields",
+          "status": 400
+        }
+      }
+    },
+    "rest_without_connection": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "Object table requires the use of connection credential.",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "with_columns": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "Specifying a schema is disallowed for STORAGE_FORMAT_OBJECT",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    },
+    "with_format": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "cannot explicitly specify format for object table",
+          "reason": "invalidQuery",
+          "status": 400
+        }
+      }
+    },
+    "without_connection": {
+      "project": "johejo-sandbox",
+      "run": "u7xjbk4utowz2ye6g65bzxcnug",
+      "steps": {
+        "create": {
+          "message": "Object table requires the use of connection credential.",
+          "reason": "invalid",
+          "status": 400
+        }
+      }
+    }
+  }
+}

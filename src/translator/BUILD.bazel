@@ -231,6 +231,7 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:coercer",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",

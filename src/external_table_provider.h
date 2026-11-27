@@ -30,6 +30,8 @@ class ExternalTableProvider {
   virtual std::vector<FieldSchema> DetectPartitionKeys(const GcsExternalData& definition,
                                                        const std::vector<FieldSchema>& declared,
                                                        const std::string& table_id) = 0;
+  // Whether --connection declares the connection `key`, as ConnectionKey gives it.
+  [[nodiscard]] virtual bool HasConnection(const std::string& /*key*/) const { return false; }
   virtual absl::StatusOr<std::vector<FieldSchema>> DescribeQuery(const std::string& key,
                                                                  const std::string& query,
                                                                  const std::string& options,

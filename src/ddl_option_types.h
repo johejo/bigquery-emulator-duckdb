@@ -74,6 +74,7 @@ enum class DdlOptionId : uint8_t {
   kTimestampFormat,
   kHivePartitionUriPrefix,
   kRequireHivePartitionFilter,
+  kObjectMetadata,
 };
 std::string_view DdlOptionContextName(DdlOptionContext context);
 std::string_view DdlOptionName(DdlOptionId option);

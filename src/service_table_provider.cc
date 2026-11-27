@@ -1,6 +1,5 @@
 #include "src/service_table_provider.h"
 
-#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,9 +9,11 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/bigtable_external.h"
+#include "src/connection_id.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/external_table.h"
@@ -21,6 +22,7 @@
 #include "src/gcs.h"
 #include "src/location.h"
 #include "src/mysql_query.h"
+#include "src/object_table.h"
 #include "src/spanner_query.h"
 #include "src/statement_resources.h"
 #include "src/table_metadata.h"
@@ -29,18 +31,6 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-// PROJECT.LOCATION.CONNECTION, where only the project may have dots.
-std::optional<std::string> ConnectionLocation(const std::string& key) {
-  const size_t connection = key.rfind('.');
-  const size_t location = connection == std::string::npos || connection == 0
-                              ? std::string::npos
-                              : key.rfind('.', connection - 1);
-  if (location == std::string::npos) {
-    return std::nullopt;
-  }
-  return CanonicalLocation(key.substr(location + 1, connection - location - 1));
-}
-
 class ServiceTableProvider : public ExternalTableProvider {
  public:
   ServiceTableProvider(ExternalConnections& connections, GcsClient gcs)
@@ -48,6 +38,9 @@ class ServiceTableProvider : public ExternalTableProvider {
 
   TableRead Read(GcsExternalData definition, std::vector<FieldSchema> schema,
                  std::string table_name) override {
+    if (definition.object_table()) {
+      return ObjectTableRead(std::move(definition), std::move(schema), gcs_);
+    }
     if (definition.format == "BIGTABLE") {
       return BigtableExternalRead(std::move(definition), std::move(schema), std::move(table_name));
     }
@@ -56,6 +49,10 @@ class ServiceTableProvider : public ExternalTableProvider {
 
   std::vector<FieldSchema> DetectSchema(const GcsExternalData& definition,
                                         const std::string& table_id) override {
+    if (definition.object_table()) {
+      CheckObjectTableConnection(definition);
+      return ObjectTableSchema();
+    }
     if (definition.format == "BIGTABLE") {
       return DetectBigtableSchema(definition);
     }
@@ -66,6 +63,10 @@ class ServiceTableProvider : public ExternalTableProvider {
                                                const std::vector<FieldSchema>& declared,
                                                const std::string& table_id) override {
     return DetectGcsPartitionKeys(definition, declared, table_id, gcs_);
+  }
+
+  [[nodiscard]] bool HasConnection(const std::string& key) const override {
+    return connections_.conninfo.contains(key);
   }
 
   // NOLINTBEGIN(bugprone-easily-swappable-parameters): a connection and its query options.
@@ -82,7 +83,8 @@ class ServiceTableProvider : public ExternalTableProvider {
       return absl::InvalidArgumentError("Connection " + key +
                                         " is not a Cloud SQL or Spanner connection");
     }
-    if (const std::optional<std::string> location = ConnectionLocation(key); location.has_value()) {
+    if (const std::optional<std::string> location = CanonicalLocation(ConnectionKeyLocation(key));
+        location.has_value()) {
       source.ReferenceLocation("Connection " + key, *location);
     }
     const bool spanner = connection->second.starts_with("spanner://");
@@ -133,6 +135,18 @@ class ServiceTableProvider : public ExternalTableProvider {
   }
 
  private:
+  // An object table reads through a Cloud resource connection that --connection declares.
+  void CheckObjectTableConnection(const GcsExternalData& definition) const {
+    const std::string key = definition.connection_id.value_or("");
+    const auto connection = connections_.conninfo.find(key);
+    if (connection == connections_.conninfo.end()) {
+      throw ApiError::NotFound("Not found: Connection " + key);
+    }
+    if (connection->second != kCloudResourceConnection) {
+      throw ApiError::Invalid("Connection " + key + " is not a Cloud resource connection");
+    }
+  }
+
   ExternalConnections& connections_;
   GcsClient gcs_;
 };

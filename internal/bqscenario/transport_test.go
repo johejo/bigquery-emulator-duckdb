@@ -334,3 +334,53 @@ func TestEmulatorTransportRetainsOperationalResponses(t *testing.T) {
 		t.Fatalf("emulator response: %+v, %v", response, err)
 	}
 }
+
+func TestGCSScenarioUploadWithMetadata(t *testing.T) {
+	var resource map[string]any
+	var media []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/upload/storage/v1/b/bucket/o" || r.URL.Query().Get("uploadType") != "multipart" {
+			t.Errorf("%s %s", r.Method, r.URL)
+		}
+		kind, parameters, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || kind != "multipart/related" {
+			t.Fatalf("Content-Type = %q, %v", r.Header.Get("Content-Type"), err)
+		}
+		reader := multipart.NewReader(r.Body, parameters["boundary"])
+		part, err := reader.NextPart()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.NewDecoder(part).Decode(&resource); err != nil {
+			t.Fatal(err)
+		}
+		part, err = reader.NextPart()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if part.Header.Get("Content-Type") != "text/plain" {
+			t.Errorf("media Content-Type = %q", part.Header.Get("Content-Type"))
+		}
+		media, _ = io.ReadAll(part)
+		_, _ = io.WriteString(w, `{"name":"run/a.txt"}`)
+	}))
+	defer server.Close()
+	transport := NewTransport("")
+	transport.GCSEndpoint = server.URL
+	contents := base64.StdEncoding.EncodeToString([]byte("hello"))
+	step := Step{GCS: &GCSRequest{
+		Method:      "PUT",
+		Object:      "${run}/a.txt",
+		Base64:      &contents,
+		ContentType: "text/plain",
+		Metadata:    map[string]string{"k": "${run}"},
+	}}
+	response, err := transport.Call(t.Context(), step, map[string]any{"bucket": "bucket", "run": "run"})
+	if err != nil || response.Failed {
+		t.Fatalf("upload = %+v, %v", response, err)
+	}
+	want := map[string]any{"name": "run/a.txt", "contentType": "text/plain", "metadata": map[string]any{"k": "run"}}
+	if !reflect.DeepEqual(resource, want) || string(media) != "hello" {
+		t.Fatalf("resource = %v, media = %q", resource, media)
+	}
+}

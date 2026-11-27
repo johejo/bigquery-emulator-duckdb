@@ -187,6 +187,21 @@ source rows.
   give numbers and booleans, with `null` for NaN and infinities, and `JSON` cells give their
   documents. A qualifier that is not valid UTF-8 has U+FFFD in place of each invalid sequence.
 
+## Object tables
+
+[Object tables](../third_party/bigquery_docs/object-table-introduction.md), created through
+`CREATE EXTERNAL TABLE ... WITH CONNECTION` with `object_metadata = 'SIMPLE'` or `tables.insert`
+with `objectMetadata`, as [BigQuery's](../third_party/bigquery_docs/object-tables.md) are, list
+the objects of their `gs://` URIs with BigQuery's fixed schema. Every query lists the objects
+again.
+
+The connection must be a Cloud resource connection in the dataset's location that
+`--connection` declares, as for [ObjectRef functions](compatibility.md#objectref-functions), and
+can read every object. Each row's `ref` names it as the authorizer.
+A query that reads the `data` pseudocolumn downloads every listed object. `WITH CONNECTION
+DEFAULT`, metadata caching (`max_staleness`, `metadata_cache_mode`) and other read options are
+unsupported.
+
 ## Updates and other interfaces
 
 `tables.patch` and `tables.update` change description, friendly name, labels, tags and

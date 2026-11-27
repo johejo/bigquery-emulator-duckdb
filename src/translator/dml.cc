@@ -68,7 +68,13 @@ bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
       Unsupported(scope, "DML on external numeric storage; copy the table first");
       return false;
     case TableWriteRestriction::kExternal:
-      throw std::invalid_argument("Cannot modify external table " + TableName(stored->reference()));
+      // BigQuery's answer for an object table, in
+      // tests/e2e/scenarios/testdata/object_tables.api.yaml.
+      throw ApiError::Invalid(
+          "DML statements are only supported over tables that have data stored in BigQuery. "
+          "Unsupported table: " +
+          stored->reference().project_id + ":" + stored->reference().dataset_id + "." +
+          stored->reference().table_id);
     case TableWriteRestriction::kSnapshot:
       throw std::invalid_argument("Invalid value: Table " + TableName(stored->reference()) +
                                   " is a snapshot, and snapshots are immutable.");

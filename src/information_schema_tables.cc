@@ -141,6 +141,19 @@ absl::StatusOr<std::string> TableDdl(
   }
   std::string ddl = std::string(external ? "CREATE EXTERNAL TABLE `" : "CREATE TABLE `") + project +
                     "." + dataset + "." + table + "`";
+  // An object table gives its connection and its two options, object_metadata unquoted; BigQuery
+  // lists the fixed columns only of one created through tables.insert, which is not autodetected.
+  if (external.has_value() && external->object_metadata.has_value()) {
+    const GcsExternalData& data = *external;
+    if (!data.autodetect.value_or(false)) {
+      ddl += "\n(\n" + absl::StrJoin(columns, ",\n") + "\n)";
+    }
+    std::vector<std::string> uris;
+    std::ranges::transform(data.uris, std::back_inserter(uris), StringOptionValue);
+    return ddl + "\nWITH CONNECTION `" + data.connection_id.value_or("") +
+           "`\nOPTIONS(\n  object_metadata=" + data.object_metadata.value_or("") + ",\n  uris=[" +
+           absl::StrJoin(uris, ", ") + "]\n);";
+  }
   // BigQuery includes the detected Bigtable schema in the DDL it displays.
   if (!external || external->format == "BIGTABLE" ||
       (external->format != "PARQUET" && !external->autodetect.value_or(false))) {
@@ -618,11 +631,20 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
             }
           }
         }
-        options.push_back({
-            .name = "format",
-            .type = "STRING",
-            .value = StringOptionValue(external.format),
-        });
+        // BigQuery gives object_metadata unquoted, unlike other STRING options.
+        if (const std::optional<std::string>& object = external.object_metadata) {
+          options.push_back({
+              .name = "object_metadata",
+              .type = "STRING",
+              .value = *object,
+          });
+        } else {
+          options.push_back({
+              .name = "format",
+              .type = "STRING",
+              .value = StringOptionValue(external.format),
+          });
+        }
         options.push_back({
             .name = "uris",
             .type = "ARRAY<STRING>",
